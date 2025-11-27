@@ -1,0 +1,350 @@
+<!-- fx-disk/demo.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FXDisk Smart Client Demo</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        h1 { 
+            color: #00ff88;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 2rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            max-width: 1400px;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .card h3 {
+            color: #00ff88;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+        .stats {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            line-height: 1.8;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .stats-label { color: #888; }
+        .stats-value { color: #00ff88; font-weight: 600; }
+        .btn {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+            color: #000;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            margin: 0.25rem;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,255,136,0.3);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.15);
+            box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+        }
+        .log {
+            background: #0a0a0a;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+        }
+        .log-entry {
+            padding: 0.2rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .log-time { color: #555; margin-right: 0.5rem; }
+        .log-info { color: #88f; }
+        .log-success { color: #8f8; }
+        .log-error { color: #f88; }
+        .log-debug { color: #888; }
+        .state-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .state-unmounted { background: #333; color: #888; }
+        .state-streaming { background: #1a3a5c; color: #4a9eff; }
+        .state-decompressing { background: #3a2a1a; color: #ffaa44; }
+        .state-ready { background: #1a3a1a; color: #00ff88; }
+        .progress-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 1rem;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88 0%, #00cc66 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡ FXDisk Smart Client</h1>
+    <p class="subtitle">Zero-latency synchronous module loading with chunk deduplication</p>
+    
+    <div class="grid">
+        <div class="card">
+            <h3>📊 Status</h3>
+            <div style="margin-bottom: 1rem;">
+                <span class="state-badge state-unmounted" id="state">UNMOUNTED</span>
+            </div>
+            <div class="stats" id="stats">
+                <div class="stats-row">
+                    <span class="stats-label">Files</span>
+                    <span class="stats-value" id="stat-files">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Chunks</span>
+                    <span class="stats-value" id="stat-chunks">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Deduped</span>
+                    <span class="stats-value" id="stat-dedups">0</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Original Size</span>
+                    <span class="stats-value" id="stat-original">0 KB</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Compressed</span>
+                    <span class="stats-value" id="stat-compressed">0 KB</span>
+                </div>
+                <div class="stats-row">
+                    <span class="stats-label">Ratio</span>
+                    <span class="stats-value" id="stat-ratio">-</span>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>🎮 Controls</h3>
+            <div style="margin-bottom: 1rem;">
+                <button class="btn" onclick="loadBundle()">📦 Load Bundle</button>
+                <button class="btn" onclick="listFiles()">📁 List Files</button>
+                <button class="btn" onclick="loadFX()">⚡ Load FX</button>
+            </div>
+            <div>
+                <button class="btn btn-secondary" onclick="runTest()">🧪 Run Test</button>
+                <button class="btn btn-secondary" onclick="clearLog()">🗑️ Clear Log</button>
+                <button class="btn btn-secondary" onclick="exportBundle()">💾 Export</button>
+            </div>
+        </div>
+        
+        <div class="card" style="grid-column: span 2;">
+            <h3>📝 Log</h3>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import FXDisk
+        import { getFXDiskClient, DiskState, LogLevel } from './index.js';
+        import * as fxLoad from './fx-load.js';
+        
+        const client = getFXDiskClient({ logLevel: LogLevel.DEBUG });
+        const logEl = document.getElementById('log');
+        
+        // Logger
+        function log(msg, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="log-time">${time}</span>${msg}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        
+        // Update stats display
+        function updateStats() {
+            const stats = client.getStats();
+            const state = client.getState();
+            
+            // Update state badge
+            const stateEl = document.getElementById('state');
+            stateEl.textContent = state;
+            stateEl.className = `state-badge state-${state.toLowerCase()}`;
+            
+            // Update stats
+            document.getElementById('stat-files').textContent = stats.filesLoaded;
+            document.getElementById('stat-chunks').textContent = stats.chunksLoaded;
+            document.getElementById('stat-dedups').textContent = stats.chunksDeduped;
+            document.getElementById('stat-original').textContent = formatSize(stats.bytesDecompressed || 0);
+            document.getElementById('stat-compressed').textContent = formatSize(stats.bytesDownloaded || 0);
+            document.getElementById('stat-ratio').textContent = 
+                stats.compressionRatio < 1 ? `${(stats.compressionRatio * 100).toFixed(1)}%` : '-';
+        }
+        
+        function formatSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+            return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+        
+        // Subscribe to events
+        client.on(event => {
+            if (event.type === 'stateChange') {
+                log(`State changed to: ${event.state}`, 'info');
+                updateStats();
+            } else if (event.type === 'progress') {
+                document.getElementById('progress').style.width = `${(event.progress || 0) * 100}%`;
+            } else if (event.type === 'error') {
+                log(`Error: ${event.error?.message}`, 'error');
+            }
+        });
+        
+        // Expose functions to window
+        window.loadBundle = async function() {
+            log('Loading bundle...', 'info');
+            try {
+                // For demo, create a simple bundle
+                const count = await demoLoadBundle();
+                log(`Loaded ${count} files`, 'success');
+                updateStats();
+            } catch (err) {
+                log(`Error: ${err.message}`, 'error');
+            }
+        };
+        
+        window.listFiles = function() {
+            const files = client.listFiles();
+            log(`Files in VFS (${files.length}):`, 'info');
+            files.forEach(f => log(`  📄 ${f}`, 'debug'));
+        };
+        
+        window.loadFX = function() {
+            log('Loading FX Framework...', 'info');
+            try {
+                // Add demo FX file
+                client.addFile('fx.ts', `
+                    const root = { __nodes: {} };
+                    function proxy() {
+                        return (path) => ({
+                            set: (v) => { root.__nodes[path] = v; },
+                            get: () => root.__nodes[path],
+                        });
+                    }
+                    export default { root, proxy };
+                `);
+                
+                const fx = fxLoad.load('fx.ts');
+                window.fx = fx;
+                log('FX loaded successfully!', 'success');
+                updateStats();
+            } catch (err) {
+                log(`Error: ${err.message}`, 'error');
+            }
+        };
+        
+        window.runTest = function() {
+            log('Running tests...', 'info');
+            try {
+                if (!window.fx) window.loadFX();
+                
+                const $$ = window.fx.proxy();
+                $$('test.demo').set({ loaded: true, time: Date.now() });
+                const val = $$('test.demo').get();
+                
+                log(`Created node: test.demo = ${JSON.stringify(val)}`, 'success');
+                log('All tests passed!', 'success');
+            } catch (err) {
+                log(`Test error: ${err.message}`, 'error');
+            }
+        };
+        
+        window.clearLog = function() {
+            logEl.innerHTML = '';
+        };
+        
+        window.exportBundle = function() {
+            log('Exporting bundle...', 'info');
+            try {
+                const bundle = client.exportBundle();
+                log(`Bundle size: ${formatSize(bundle.length)}`, 'success');
+                
+                // Trigger download
+                const blob = new Blob([bundle], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'fx-bundle.bin';
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                log(`Export error: ${err.message}`, 'error');
+            }
+        };
+        
+        async function demoLoadBundle() {
+            // Create demo files
+            const files = [
+                ['fx.ts', 'export default { version: "1.0.0", ready: true };'],
+                ['plugin-a.ts', 'export const name = "Plugin A";'],
+                ['plugin-b.ts', 'export const name = "Plugin B";'],
+                ['shared/utils.ts', 'export function log(m) { console.log(m); }'],
+            ];
+            
+            for (const [path, content] of files) {
+                client.addFile(path, content);
+                await new Promise(r => setTimeout(r, 50)); // Simulate loading
+            }
+            
+            return files.length;
+        }
+        
+        // Initialize
+        log('FXDisk Smart Client initialized', 'info');
+        updateStats();
+    </script>
+</body>
+</html>

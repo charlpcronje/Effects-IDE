@@ -1,0 +1,65 @@
+{
+  "name": "fx-scout-test-manifest",
+  "version": "1.0.0",
+  "description": "Test manifest for FX Scout plugin",
+  "plugins": [
+    {
+      "name": "scout",
+      "enabled": true,
+      "options": {
+        "cacheEnabled": true,
+        "workerEnabled": true,
+        "maxDepth": 15,
+        "maxCacheSize": 200
+      }
+    }
+  ],
+  "modules": {
+    "lazyLoad": true,
+    "preload": [
+      "./modules/module-c.js"
+    ],
+    "aliases": {
+      "@utils": "./modules/module-c.js",
+      "@components": "./modules/"
+    }
+  },
+  "dependencies": [
+    {
+      "name": "module-a",
+      "path": "./modules/module-a.js",
+      "lazy": false
+    },
+    {
+      "name": "module-b",
+      "path": "./modules/module-b.js",
+      "lazy": true,
+      "onLoad": "console.log('Module B loaded via manifest');"
+    },
+    {
+      "name": "test-component",
+      "path": "./modules/test-component.fxc",
+      "type": "component",
+      "lazy": true
+    }
+  ],
+  "hooks": {
+    "afterModuleLoad": [
+      {
+        "module": "module-a",
+        "callback": "console.log('Module A loaded, running hook');"
+      }
+    ],
+    "beforeComponentLoad": [
+      {
+        "component": "test-component",
+        "callback": "console.log('About to load test component');"
+      }
+    ]
+  },
+  "optimization": {
+    "bundleModules": true,
+    "minify": false,
+    "treeshake": true
+  }
+}

@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FX Plugin Loading - Complete Example</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        pre {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .demo-element {
+            padding: 20px;
+            margin: 10px 0;
+            background: white;
+            border: 2px dashed #ddd;
+            border-radius: 4px;
+        }
+        #output {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 FX Plugin Loading - Complete Example</h1>
+
+        <!-- Status Section -->
+        <div class="section">
+            <h2>System Status</h2>
+            <div id="status" class="status info">Initializing...</div>
+            <button onclick="checkStatus()">🔍 Check Status</button>
+            <button onclick="showVFSContents()">📁 Show VFS Contents</button>
+            <button onclick="showLoadedPlugins()">🔌 Show Loaded Plugins</button>
+        </div>
+
+        <!-- Plugin Loading Section -->
+        <div class="section">
+            <h2>Plugin Loading</h2>
+            <p>Click to load plugins using the enhanced @ syntax:</p>
+            <button onclick="loadDomPlugin()">Load $dom Plugin</button>
+            <button onclick="loadCachePlugin()">Load $cache Plugin</button>
+            <button onclick="loadCustomPlugin()">Load Custom Plugin</button>
+        </div>
+
+        <!-- DOM Plugin Demo -->
+        <div class="section">
+            <h2>$dom Plugin Demo</h2>
+            <div id="demo-element" class="demo-element">
+                This is a demo element. Use the $dom plugin to style it!
+            </div>
+            <button onclick="demoCSS()">🎨 Apply CSS</button>
+            <button onclick="demoAttributes()">📝 Set Attributes</button>
+            <button onclick="demoText()">📄 Change Text</button>
+        </div>
+
+        <!-- Cache Plugin Demo -->
+        <div class="section">
+            <h2>$cache Plugin Demo</h2>
+            <button onclick="demoCache()">💾 Test Cache</button>
+            <button onclick="demoCacheStats()">📊 Show Cache Stats</button>
+            <button onclick="demoClearCache()">🗑️ Clear Cache</button>
+        </div>
+
+        <!-- FX Tree Navigator -->
+        <div class="section">
+            <h2>FX Tree Navigator</h2>
+            <input type="text" id="path-input" placeholder="Enter FX path (e.g., plugins.dom)" style="width: 300px; padding: 8px;">
+            <button onclick="navigatePath()">🔍 Navigate</button>
+            <button onclick="showTree()">🌳 Show Full Tree</button>
+        </div>
+
+        <!-- Output Console -->
+        <div class="section">
+            <h2>Console Output</h2>
+            <div id="output"></div>
+            <button onclick="clearOutput()">🗑️ Clear Output</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import FX and fx-disk
+        import { FXCore } from '../../fx.ts';
+        import { FXDiskSyncLoader, patchFXWithPluginLoader } from '../index.js';
+
+        // Global state
+        let fx, $$, pluginLoader;
+
+        // Output logging
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = {
+                info: '#61dafb',
+                success: '#98c379',
+                error: '#e06c75',
+                warn: '#e5c07b'
+            }[type] || '#abb2bf';
+
+            output.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Initialize FX
+        async function initFX() {
+            try {
+                log('Initializing FX...', 'info');
+
+                // Create FX instance
+                fx = new FXCore();
+
+                // Create inline bundle for demo
+                log('Creating inline plugin bundle...', 'info');
+                const plugins = {
+                    'plugins/fx-dom-dollar.ts': createDomPlugin(),
+                    'plugins/fx-cache.ts': createCachePlugin()
+                };
+
+                // Setup VFS loader with inline plugins
+                fx.moduleLoader = {
+                    loadSync: (path) => {
+                        log(`Loading module: ${path}`, 'info');
+                        if (plugins[path]) {
+                            return plugins[path];
+                        }
+                        throw new Error(`Module not found: ${path}`);
+                    },
+                    exists: (path) => !!plugins[path],
+                    listFiles: () => Object.keys(plugins),
+                    getStats: () => ({
+                        vfsFiles: Object.keys(plugins).length,
+                        vfsReady: true
+                    })
+                };
+
+                // Enable plugin loader
+                pluginLoader = patchFXWithPluginLoader(fx);
+                $$ = fx.proxy();
+
+                // Make global
+                window.fx = fx;
+                window.$$ = $$;
+
+                log('✅ FX initialized successfully!', 'success');
+                updateStatus('System ready', 'success');
+
+            } catch (error) {
+                log(`❌ Initialization failed: ${error.message}`, 'error');
+                updateStatus('Initialization failed', 'error');
+            }
+        }
+
+        // Simple inline plugins for demo
+        function createDomPlugin() {
+            return `
+                export default function(fx) {
+                    return {
+                        name: "dom",
+                        css(selector, styles) {
+                            const el = document.querySelector(selector);
+                            if (el) {
+                                Object.assign(el.style, styles);
+                            }
+                            return this;
+                        },
+                        attr(selector, attrs) {
+                            const el = document.querySelector(selector);
+                            if (el) {
+                                for (const [k, v] of Object.entries(attrs)) {
+                                    el.setAttribute(k, v);
+                                }
+                            }
+                            return this;
+                        },
+                        text(selector, value) {
+                            const el = document.querySelector(selector);
+                            if (el) {
+                                el.textContent = value;
+                            }
+                            return this;
+                        }
+                    };
+                }
+            `;
+        }
+
+        function createCachePlugin() {
+            return `
+                export default function(fx) {
+                    const cache = new Map();
+                    let stats = { hits: 0, misses: 0, sets: 0 };
+
+                    return {
+                        name: "cache",
+                        set(key, value) {
+                            cache.set(key, value);
+                            stats.sets++;
+                            return this;
+                        },
+                        get(key) {
+                            const has = cache.has(key);
+                            if (has) stats.hits++;
+                            else stats.misses++;
+                            return cache.get(key);
+                        },
+                        has(key) {
+                            return cache.has(key);
+                        },
+                        delete(key) {
+                            return cache.delete(key);
+                        },
+                        clear() {
+                            cache.clear();
+                            stats = { hits: 0, misses: 0, sets: 0 };
+                        },
+                        stats() {
+                            return { ...stats, size: cache.size };
+                        }
+                    };
+                }
+            `;
+        }
+
+        // UI Functions
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        window.checkStatus = () => {
+            const stats = fx.moduleLoader.getStats();
+            log(`VFS Stats: ${JSON.stringify(stats)}`, 'info');
+
+            const pluginStats = pluginLoader.getStats();
+            log(`Plugin Stats: ${JSON.stringify(pluginStats)}`, 'info');
+
+            updateStatus(`System OK | VFS Files: ${stats.vfsFiles} | Loaded Plugins: ${pluginStats.loadedCount}`, 'success');
+        };
+
+        window.showVFSContents = () => {
+            const files = fx.moduleLoader.listFiles();
+            log(`VFS Contents (${files.length} files):`, 'info');
+            files.forEach(file => log(`  - ${file}`, 'info'));
+        };
+
+        window.showLoadedPlugins = () => {
+            const stats = pluginLoader.getStats();
+            log(`Loaded Plugins (${stats.loadedCount}):`, 'info');
+            stats.plugins.forEach(plugin => log(`  - ${plugin}`, 'info'));
+        };
+
+        window.loadDomPlugin = () => {
+            try {
+                log('Loading $dom plugin...', 'info');
+                $$("plugins.dom@plugins/fx-dom-dollar.ts").options({
+                    global: "$dom"
+                });
+                log('✅ $dom plugin loaded!', 'success');
+                updateStatus('$dom plugin loaded', 'success');
+            } catch (error) {
+                log(`❌ Failed to load $dom: ${error.message}`, 'error');
+            }
+        };
+
+        window.loadCachePlugin = () => {
+            try {
+                log('Loading $cache plugin...', 'info');
+                $$("plugins.cache@plugins/fx-cache.ts").options({
+                    global: "$cache"
+                });
+                log('✅ $cache plugin loaded!', 'success');
+                updateStatus('$cache plugin loaded', 'success');
+            } catch (error) {
+                log(`❌ Failed to load $cache: ${error.message}`, 'error');
+            }
+        };
+
+        window.demoCSS = () => {
+            if (!window.$dom) {
+                log('❌ Load $dom plugin first!', 'error');
+                return;
+            }
+            log('Applying CSS styles...', 'info');
+            window.$dom.css('#demo-element', {
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                padding: '30px',
+                borderRadius: '8px',
+                fontSize: '18px'
+            });
+            log('✅ CSS applied!', 'success');
+        };
+
+        window.demoAttributes = () => {
+            if (!window.$dom) {
+                log('❌ Load $dom plugin first!', 'error');
+                return;
+            }
+            log('Setting attributes...', 'info');
+            window.$dom.attr('#demo-element', {
+                'data-styled': 'true',
+                'data-timestamp': Date.now()
+            });
+            log('✅ Attributes set!', 'success');
+        };
+
+        window.demoText = () => {
+            if (!window.$dom) {
+                log('❌ Load $dom plugin first!', 'error');
+                return;
+            }
+            log('Changing text...', 'info');
+            window.$dom.text('#demo-element', '🎉 This text was changed using $dom!');
+            log('✅ Text changed!', 'success');
+        };
+
+        window.demoCache = () => {
+            if (!window.$cache) {
+                log('❌ Load $cache plugin first!', 'error');
+                return;
+            }
+            log('Testing cache...', 'info');
+            window.$cache.set('user:1', { name: 'Alice', role: 'Admin' });
+            window.$cache.set('user:2', { name: 'Bob', role: 'User' });
+            window.$cache.set('config', { theme: 'dark', lang: 'en' });
+
+            log(`Cached user:1: ${JSON.stringify(window.$cache.get('user:1'))}`, 'success');
+            log(`Cached user:2: ${JSON.stringify(window.$cache.get('user:2'))}`, 'success');
+            log(`Cached config: ${JSON.stringify(window.$cache.get('config'))}`, 'success');
+        };
+
+        window.demoCacheStats = () => {
+            if (!window.$cache) {
+                log('❌ Load $cache plugin first!', 'error');
+                return;
+            }
+            const stats = window.$cache.stats();
+            log(`Cache Stats: ${JSON.stringify(stats, null, 2)}`, 'info');
+        };
+
+        window.demoClearCache = () => {
+            if (!window.$cache) {
+                log('❌ Load $cache plugin first!', 'error');
+                return;
+            }
+            window.$cache.clear();
+            log('✅ Cache cleared!', 'success');
+        };
+
+        window.clearOutput = () => {
+            document.getElementById('output').innerHTML = '';
+        };
+
+        // Initialize on load
+        initFX();
+    </script>
+</body>
+</html>

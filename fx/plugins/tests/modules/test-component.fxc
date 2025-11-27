@@ -1,0 +1,51 @@
+---
+name: test-component
+version: 1.0.0
+type: component
+author: FX Scout Test
+---
+
+--- template
+<div class="fx-test-component">
+    <h1>{{ title }}</h1>
+    <p>{{ description }}</p>
+</div>
+
+--- style
+.fx-test-component {
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.fx-test-component h1 {
+    color: #333;
+    margin: 0 0 10px 0;
+}
+
+--- script
+import { utilityC } from './module-c.js';
+
+export default {
+    data() {
+        return {
+            title: "FX Test Component",
+            description: "Testing FX Scout component loading"
+        };
+    },
+    mounted() {
+        console.log('Component mounted, utility says:', utilityC());
+    }
+}
+
+--- data
+{
+    "defaults": {
+        "title": "Default Title",
+        "description": "Default Description"
+    },
+    "validation": {
+        "title": "string|required",
+        "description": "string"
+    }
+}
