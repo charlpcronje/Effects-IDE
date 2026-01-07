@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./dist/renderer",
+    "rootDir": "./src/renderer"
+  },
+  "include": ["src/renderer/**/*", "src/shared/**/*", "src/panels/**/*", "src/scene/**/*", "src/themes/**/*"],
+  "exclude": ["node_modules"]
+}
