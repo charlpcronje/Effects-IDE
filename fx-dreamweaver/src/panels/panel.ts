@@ -146,7 +146,7 @@ export class Panel {
             pointer-events: auto;
         `;
 
-        // Title bar
+        // Title bar (make it draggable!)
         const titleBar = document.createElement('div');
         titleBar.className = 'panel-title-bar';
         titleBar.style.cssText = `
@@ -158,7 +158,42 @@ export class Panel {
             padding: 0 12px;
             gap: 8px;
             cursor: grab;
+            pointer-events: auto;
         `;
+
+        // Make title bar draggable
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+
+        titleBar.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            titleBar.style.cursor = 'grabbing';
+            dragStart = {
+                x: e.clientX - this.config.position.x,
+                y: e.clientY - this.config.position.y
+            };
+            e.stopPropagation();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const newX = e.clientX - dragStart.x;
+                const newY = e.clientY - dragStart.y;
+                this.setPosition(newX, newY, this.config.position.z);
+
+                // Update FX state
+                this.fxBridge.updatePanel(this.config.id, {
+                    position: { x: newX, y: newY, z: this.config.position.z }
+                });
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                titleBar.style.cursor = 'grab';
+            }
+        });
 
         // Title
         const title = document.createElement('span');
@@ -230,7 +265,46 @@ export class Panel {
         `;
         btn.addEventListener('mouseenter', () => btn.style.opacity = '1');
         btn.addEventListener('mouseleave', () => btn.style.opacity = '0.8');
+
+        // Add functionality
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (type === 'close') {
+                this.dispose();
+            } else if (type === 'minimize') {
+                this.toggleMinimize();
+            } else if (type === 'maximize') {
+                this.toggleMaximize();
+            }
+        });
+
         return btn;
+    }
+
+    /**
+     * Toggle minimize
+     */
+    private toggleMinimize(): void {
+        this.config.minimized = !this.config.minimized;
+        const content = this.getContentElement();
+        if (content && this.htmlElement) {
+            if (this.config.minimized) {
+                this.htmlElement.style.height = '32px';
+                content.style.display = 'none';
+            } else {
+                this.htmlElement.style.height = `${this.config.size.height}px`;
+                content.style.display = 'flex';
+            }
+        }
+    }
+
+    /**
+     * Toggle maximize
+     */
+    private toggleMaximize(): void {
+        this.config.maximized = !this.config.maximized;
+        // TODO: Implement maximize to fullscreen
+        console.log('[Panel] Maximize toggled:', this.config.maximized);
     }
 
     /**

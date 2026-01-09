@@ -139,7 +139,7 @@ export class DreamweaverApp {
     togglePanel(type: string): void {
         const existing = this.panelManager.findPanelByType(type);
         if (existing) {
-            this.panelManager.removePanel(existing.id);
+            this.panelManager.removePanel(existing.getId());
         } else {
             this.panelManager.createPanel(`${type}-${Date.now()}`, {
                 type: type as any,

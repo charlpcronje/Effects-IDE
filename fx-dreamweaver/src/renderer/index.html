@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
     <title>FX Dreamweaver 3D</title>
     <style>
         * {
@@ -136,37 +136,177 @@
         <div id="panel-container"></div>
     </div>
 
-    <!-- Load renderer -->
-    <script type="module">
-        import { DreamweaverApp } from './index.js';
+    <!-- Load FX Disk Loader (compiled to CommonJS) -->
+    <script>
+        // Bootstrap: Load FX Disk and initialize the IDE
+        (async function bootstrap() {
+            const loading = document.getElementById('loading');
+            const statusDiv = loading.querySelector('.status') || document.createElement('div');
+            statusDiv.className = 'status';
+            if (!loading.contains(statusDiv)) {
+                loading.appendChild(statusDiv);
+            }
 
-        // Hide loading screen when ready
-        window.addEventListener('DOMContentLoaded', async () => {
+            function updateStatus(message) {
+                statusDiv.textContent = message;
+                console.log('[Bootstrap]', message);
+            }
+
             try {
+                updateStatus('Loading FX Bundle...');
+
+                // Load the bundle directly (it's one level up from renderer/)
+                const bundleResponse = await fetch('../fx-bundle.bin');
+                const bundleText = await bundleResponse.text();
+                const bundle = JSON.parse(bundleText);
+
+                console.log('[FXDisk] Bundle loaded:', bundle.metadata);
+
+                // Create a simple module loader
+                const moduleCache = new Map();
+
+                function loadModule(modulePath) {
+                    // Check cache
+                    if (moduleCache.has(modulePath)) {
+                        return moduleCache.get(modulePath);
+                    }
+
+                    // Normalize path
+                    const normalizedPath = modulePath.replace(/\\/g, '/');
+
+                    // Get file from bundle
+                    const fileInfo = bundle.files[normalizedPath];
+                    if (!fileInfo) {
+                        throw new Error(`Module not found: ${normalizedPath}`);
+                    }
+
+                    // Reconstruct file from chunks
+                    const chunks = [];
+                    for (const chunkHash of fileInfo.chunks) {
+                        const chunk = bundle.chunks[chunkHash];
+                        if (!chunk) {
+                            throw new Error(`Chunk not found: ${chunkHash}`);
+                        }
+                        chunks.push(atob(chunk.data));
+                    }
+                    const code = chunks.join('');
+
+                    // Execute module
+                    const module = { exports: {} };
+                    const exports = module.exports;
+
+                    // Create a simplified require function
+                    function moduleRequire(path) {
+                        // Handle Three.js specifically
+                        if (path === 'three') {
+                            return window.THREE;
+                        }
+
+                        // Handle relative imports
+                        if (path.startsWith('./') || path.startsWith('../')) {
+                            const parts = modulePath.split('/');
+                            parts.pop(); // Remove filename
+                            const importParts = path.split('/');
+
+                            for (const part of importParts) {
+                                if (part === '..') parts.pop();
+                                else if (part !== '.') parts.push(part);
+                            }
+
+                            let resolved = parts.join('/');
+                            if (!resolved.endsWith('.js')) resolved += '.js';
+                            return loadModule(resolved);
+                        }
+                        // For other external modules, return empty object
+                        return {};
+                    }
+
+                    // Execute the code
+                    try {
+                        const func = new Function('exports', 'module', 'require', code);
+                        func(exports, module, moduleRequire);
+                    } catch (err) {
+                        console.error(`Error executing ${modulePath}:`, err);
+                        throw err;
+                    }
+
+                    // Cache and return
+                    moduleCache.set(modulePath, module.exports);
+                    return module.exports;
+                }
+
+                updateStatus('Loading Three.js...');
+                // Load Three.js via script tag (use CommonJS build instead of module)
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    // Path from dist/renderer/index.html to node_modules at project root
+                    script.src = '../../node_modules/three/build/three.js';
+                    script.onload = () => {
+                        console.log('[Bootstrap] Three.js loaded');
+                        // Three.js exposes THREE globally in CommonJS build
+                        window.THREE = window.THREE || {};
+                        resolve();
+                    };
+                    script.onerror = (err) => {
+                        console.error('[Bootstrap] Failed to load Three.js:', err);
+                        reject(new Error('Failed to load Three.js'));
+                    };
+                    document.head.appendChild(script);
+                });
+
+                // Give Three.js a moment to initialize
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                updateStatus('Loading application modules...');
+
+                // Load modules from bundle
+                console.log('[Bootstrap] Loading modules from bundle...');
+
+                const fxBridge = loadModule('renderer/renderer/fx-bridge.js');
+                const appModule = loadModule('renderer/renderer/app.js');
+                const sceneModule = loadModule('renderer/scene/scene-manager.js');
+                const panelManagerModule = loadModule('renderer/panels/panel-manager.js');
+                const themeModule = loadModule('renderer/themes/theme-manager.js');
+
+                console.log('[Bootstrap] Modules loaded successfully');
+
+                updateStatus('Initializing Dreamweaver IDE...');
+
+                // Get the DreamweaverApp class
+                const { DreamweaverApp } = appModule;
+
+                if (!DreamweaverApp) {
+                    throw new Error('DreamweaverApp not found in app module');
+                }
+
+                // Create and initialize the app
                 const app = new DreamweaverApp();
                 await app.init();
+
+                // Store globally for debugging
                 window.dreamweaverApp = app;
 
                 // Hide loading screen
-                const loading = document.getElementById('loading');
-                if (loading) {
-                    loading.classList.add('hidden');
-                    setTimeout(() => loading.remove(), 300);
-                }
+                loading.classList.add('hidden');
+                setTimeout(() => loading.remove(), 300);
 
-                console.log('[Dreamweaver] Ready');
+                console.log('[Dreamweaver] ✅ IDE Ready!');
+                console.log('[Dreamweaver] - 3D Scene initialized');
+                console.log('[Dreamweaver] - Panels created');
+                console.log('[Dreamweaver] - Theme applied');
+                console.log('[Dreamweaver] - Input handlers active');
+
             } catch (error) {
-                console.error('[Dreamweaver] Failed to initialize:', error);
-                const loading = document.getElementById('loading');
-                if (loading) {
-                    loading.innerHTML = `
-                        <h1>FX Dreamweaver 3D</h1>
-                        <p style="color: #ef4444;">Failed to initialize</p>
-                        <p style="color: #94a3b8; font-size: 12px; margin-top: 8px;">${error.message}</p>
-                    `;
-                }
+                console.error('[Bootstrap] Failed:', error);
+                loading.innerHTML = `
+                    <h1>FX Dreamweaver 3D</h1>
+                    <p style="color: #ef4444; margin-top: 1rem;">✗ Failed to initialize</p>
+                    <p style="color: #94a3b8; font-size: 13px; margin-top: 0.5rem;">${error.message}</p>
+                    <pre style="color: #64748b; font-size: 11px; margin-top: 1rem; text-align: left; max-width: 600px; overflow: auto;">${error.stack}</pre>
+                    <button onclick="location.reload()" style="margin-top: 1rem; padding: 8px 16px; background: #3b82f6; border: none; color: white; border-radius: 4px; cursor: pointer;">Reload</button>
+                `;
             }
-        });
+        })();
     </script>
 </body>
 </html>

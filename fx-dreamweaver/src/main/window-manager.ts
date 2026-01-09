@@ -47,11 +47,11 @@ export class WindowManager {
             trafficLightPosition: { x: 16, y: 16 },
             webPreferences: {
                 preload: path.join(__dirname, 'preload.js'),
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: true,
+                nodeIntegration: true,  // Enable for FX Disk loader
+                contextIsolation: false, // Disable for require() access
+                sandbox: false,          // Disable for full Node.js access
                 webgl: true,
-                webSecurity: true
+                webSecurity: false       // Allow loading local resources
             }
         });
 

@@ -132,6 +132,8 @@ export class InputManager {
 
     private handleMouseDown(event: MouseEvent): void {
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Check if clicking on a panel
         if (hit && hit.userData?.panelId) {
             this.isDragging = true;
             this.dragTarget = hit.userData.panelId;
@@ -142,6 +144,41 @@ export class InputManager {
 
             // Select panel
             this.panelManager.selectPanel(hit.userData.panelId);
+            return;
+        }
+
+        // Check if clicking on a grid block
+        if (hit && hit.object.userData?.type === 'grid-block') {
+            const gridManager = this.sceneManager.getGridManager();
+            const { gridX, gridY } = hit.object.userData;
+
+            if (event.shiftKey) {
+                // Shift+click lowers block
+                const block = gridManager.getBlock(gridX, gridY);
+                if (block) {
+                    gridManager.setBlockHeight(gridX, gridY, block.height - 50);
+                }
+            } else if (event.ctrlKey) {
+                // Ctrl+click selects block
+                gridManager.selectBlock(gridX, gridY);
+            } else {
+                // Regular click extrudes
+                const block = gridManager.getBlock(gridX, gridY);
+                if (block) {
+                    gridManager.setBlockHeight(gridX, gridY, block.height + 50);
+                }
+            }
+            return;
+        }
+
+        // Check if clicking on empty grid
+        const gridPos = this.sceneManager.raycastToGridPlane(event.clientX, event.clientY);
+        if (gridPos) {
+            const gridManager = this.sceneManager.getGridManager();
+            if (!event.shiftKey && !event.ctrlKey) {
+                // Create new block
+                gridManager.handleGridClick(gridPos.x, gridPos.y, false);
+            }
         }
     }
 
@@ -160,6 +197,21 @@ export class InputManager {
             // Hover effect
             const hit = this.sceneManager.raycast(event.clientX, event.clientY);
             this.sceneManager.setHoveredObject(hit?.object || null);
+
+            // Grid hover
+            if (hit && hit.object.userData?.type === 'grid-block') {
+                const gridManager = this.sceneManager.getGridManager();
+                const { gridX, gridY } = hit.object.userData;
+                gridManager.handleGridHover(gridX * 50, gridY * 50);
+            } else {
+                const gridPos = this.sceneManager.raycastToGridPlane(event.clientX, event.clientY);
+                if (gridPos) {
+                    const gridManager = this.sceneManager.getGridManager();
+                    gridManager.handleGridHover(gridPos.x, gridPos.y);
+                } else {
+                    this.sceneManager.getGridManager().clearHover();
+                }
+            }
         }
     }
 
@@ -184,7 +236,14 @@ export class InputManager {
 
     private handleDoubleClick(event: MouseEvent): void {
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Double-click on panel - focus camera
         if (hit && hit.userData?.panelId) {
+            const panel = this.panelManager.getPanel(hit.userData.panelId);
+            if (panel) {
+                const pos = panel.getPosition();
+                this.sceneManager.focusOn(pos);
+            }
             this.panelManager.focusPanel(hit.userData.panelId);
         }
     }

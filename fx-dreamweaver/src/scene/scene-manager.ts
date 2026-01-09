@@ -3,6 +3,7 @@
  */
 
 import * as THREE from 'three';
+import { GridManager } from './grid-manager';
 
 export type ViewMode = '2d' | '3d' | 'hybrid';
 
@@ -29,9 +30,10 @@ export class SceneManager {
     private hoveredObject: THREE.Object3D | null = null;
     private selectedObjects: Set<THREE.Object3D> = new Set();
 
-    private gridHelper: THREE.GridHelper | null = null;
+    private gridManager: GridManager;
     private ambientLight: THREE.AmbientLight;
     private directionalLight: THREE.DirectionalLight;
+    private pointLight: THREE.PointLight;
 
     constructor(container: HTMLElement, config: SceneConfig = {}) {
         this.container = container;
@@ -74,13 +76,26 @@ export class SceneManager {
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
 
+        // Initialize grid manager
+        this.gridManager = new GridManager(this);
+
         // Initialize lights
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         this.scene.add(this.ambientLight);
 
-        this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
         this.directionalLight.position.set(500, 500, 500);
+        this.directionalLight.castShadow = true;
+        this.directionalLight.shadow.camera.left = -1000;
+        this.directionalLight.shadow.camera.right = 1000;
+        this.directionalLight.shadow.camera.top = 1000;
+        this.directionalLight.shadow.camera.bottom = -1000;
         this.scene.add(this.directionalLight);
+
+        // Add point light for highlights
+        this.pointLight = new THREE.PointLight(0x3b82f6, 0.5, 1000);
+        this.pointLight.position.set(0, 0, 300);
+        this.scene.add(this.pointLight);
 
         // Handle resize
         window.addEventListener('resize', () => this.handleResize());
@@ -91,20 +106,17 @@ export class SceneManager {
      * Initialize scene
      */
     async init(): Promise<void> {
-        // Create grid
-        this.createGrid();
+        // Initialize grid manager
+        this.gridManager.init();
 
         console.log('[SceneManager] Initialized');
     }
 
     /**
-     * Create grid helper
+     * Get grid manager
      */
-    private createGrid(): void {
-        this.gridHelper = new THREE.GridHelper(2000, 40, 0x334155, 0x1e293b);
-        this.gridHelper.rotation.x = Math.PI / 2;
-        this.gridHelper.position.z = -10;
-        this.scene.add(this.gridHelper);
+    getGridManager(): GridManager {
+        return this.gridManager;
     }
 
     /**
@@ -127,6 +139,9 @@ export class SceneManager {
         // Smooth zoom
         this.zoom += (this.targetZoom - this.zoom) * 0.1;
         this.camera.position.z = 1000 / this.zoom;
+
+        // Update grid manager
+        this.gridManager.update();
 
         // Render
         this.renderer.render(this.scene, this.camera);
@@ -164,7 +179,6 @@ export class SceneManager {
                 // Top-down view
                 this.camera.position.set(this.panOffset.x, this.panOffset.y, 1000 / this.zoom);
                 this.camera.rotation.set(0, 0, 0);
-                if (this.gridHelper) this.gridHelper.rotation.x = Math.PI / 2;
                 break;
 
             case '3d':
@@ -175,7 +189,6 @@ export class SceneManager {
                     500 / this.zoom
                 );
                 this.camera.lookAt(this.panOffset.x, this.panOffset.y, 0);
-                if (this.gridHelper) this.gridHelper.rotation.x = 0;
                 break;
 
             case 'hybrid':
@@ -186,7 +199,6 @@ export class SceneManager {
                     800 / this.zoom
                 );
                 this.camera.lookAt(this.panOffset.x, this.panOffset.y, 0);
-                if (this.gridHelper) this.gridHelper.rotation.x = Math.PI / 4;
                 break;
         }
 
@@ -238,6 +250,27 @@ export class SceneManager {
 
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
         return intersects.length > 0 ? intersects[0] : null;
+    }
+
+    /**
+     * Raycast to grid plane (Z=0)
+     */
+    raycastToGridPlane(x: number, y: number): THREE.Vector3 | null {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        // Create a plane at Z=0
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        const intersection = new THREE.Vector3();
+
+        if (this.raycaster.ray.intersectPlane(plane, intersection)) {
+            return intersection;
+        }
+
+        return null;
     }
 
     /**

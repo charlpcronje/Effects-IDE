@@ -8,8 +8,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist/main",
-    "rootDir": "./src/main"
+    "outDir": "./dist/main"
   },
   "include": ["src/main/**/*", "src/shared/**/*"],
   "exclude": ["node_modules"]

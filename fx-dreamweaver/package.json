@@ -5,7 +5,9 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "npm run build && electron .",
-    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
+    "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json && npm run copy-assets && npm run build:bundle",
+    "copy-assets": "node -e \"require('fs').cpSync('src/renderer/index.html', 'dist/renderer/index.html')\"",
+    "build:bundle": "node scripts/build-bundle.js",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "tsc -p tsconfig.renderer.json",
     "start": "electron .",
