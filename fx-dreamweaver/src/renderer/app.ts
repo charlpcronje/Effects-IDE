@@ -8,6 +8,7 @@ import { ThemeManager } from '../themes/theme-manager';
 import { FXBridge } from './fx-bridge';
 import { InputManager } from './input-manager';
 import { CommandPalette } from './command-palette';
+import { LayoutManager } from './layout-manager';
 
 export class DreamweaverApp {
     private sceneManager: SceneManager;
@@ -16,6 +17,7 @@ export class DreamweaverApp {
     private fxBridge: FXBridge;
     private inputManager: InputManager;
     private commandPalette: CommandPalette;
+    private layoutManager: LayoutManager;
 
     private container: HTMLElement;
     private running: boolean = false;
@@ -28,6 +30,7 @@ export class DreamweaverApp {
         this.panelManager = new PanelManager(this.sceneManager, this.fxBridge);
         this.inputManager = new InputManager(this.sceneManager, this.panelManager);
         this.commandPalette = new CommandPalette(this);
+        this.layoutManager = new LayoutManager(this.sceneManager, this.panelManager, this.fxBridge);
     }
 
     /**
@@ -167,6 +170,77 @@ export class DreamweaverApp {
         window.dreamweaver.on('menu:open-project', async (path: string) => {
             await this.openProject(path);
         });
+
+        // Layout save/load
+        window.dreamweaver.on('menu:save', () => this.saveLayout());
+        window.dreamweaver.on('menu:export-workspace', () => this.exportLayout());
+        window.dreamweaver.on('menu:import-workspace', () => this.importLayout());
+    }
+
+    /**
+     * Save current layout
+     */
+    async saveLayout(name?: string): Promise<void> {
+        const layoutName = name || await this.promptLayoutName();
+        if (layoutName) {
+            await this.layoutManager.saveLayout(layoutName);
+            console.log(`[App] Layout saved: ${layoutName}`);
+        }
+    }
+
+    /**
+     * Load a layout
+     */
+    async loadLayout(name: string): Promise<void> {
+        await this.layoutManager.loadLayout(name);
+        console.log(`[App] Layout loaded: ${name}`);
+    }
+
+    /**
+     * Export layout to file
+     */
+    async exportLayout(): Promise<void> {
+        const name = this.layoutManager.getCurrentLayoutName();
+        const json = this.layoutManager.exportLayout(name);
+
+        if (json) {
+            const result = await window.dreamweaver.dialog.save({
+                title: 'Export Layout',
+                defaultPath: `${name}.fxlayout`,
+                filters: [{ name: 'FX Layout', extensions: ['fxlayout'] }]
+            });
+
+            if (!result.canceled && result.filePath) {
+                await window.dreamweaver.fs.write(result.filePath, json);
+                console.log(`[App] Layout exported to: ${result.filePath}`);
+            }
+        }
+    }
+
+    /**
+     * Import layout from file
+     */
+    async importLayout(): Promise<void> {
+        const result = await window.dreamweaver.dialog.open({
+            title: 'Import Layout',
+            filters: [{ name: 'FX Layout', extensions: ['fxlayout'] }],
+            properties: ['openFile']
+        });
+
+        if (!result.canceled && result.filePaths.length > 0) {
+            const json = await window.dreamweaver.fs.read(result.filePaths[0]);
+            const name = result.filePaths[0].split('/').pop()?.replace('.fxlayout', '');
+            this.layoutManager.importLayout(json, name);
+            console.log(`[App] Layout imported`);
+        }
+    }
+
+    /**
+     * Prompt for layout name
+     */
+    private async promptLayoutName(): Promise<string | null> {
+        // Simple prompt (in production, use a proper dialog)
+        return prompt('Layout name:', this.layoutManager.getCurrentLayoutName());
     }
 
     /**
@@ -260,5 +334,12 @@ export class DreamweaverApp {
      */
     getThemeManager(): ThemeManager {
         return this.themeManager;
+    }
+
+    /**
+     * Get layout manager
+     */
+    getLayoutManager(): LayoutManager {
+        return this.layoutManager;
     }
 }
