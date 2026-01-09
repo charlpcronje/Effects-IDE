@@ -90,6 +90,50 @@ export class DreamweaverApp {
             position: { x: 0, y: -400, z: 0 },
             size: { width: 1200, height: 250 }
         });
+
+        // Create demo icons on the grid
+        this.createDemoIcons();
+    }
+
+    /**
+     * Create demo icons to show the icon system
+     */
+    private createDemoIcons(): void {
+        const iconManager = this.sceneManager.getIconManager();
+
+        // Create a row of command icons
+        iconManager.createIcon('icon-search', 'search', -300, -600, 15, 'Search Files', () => {
+            console.log('Search clicked!');
+        });
+
+        iconManager.createIcon('icon-git', 'git', -200, -600, 15, 'Git', () => {
+            console.log('Git clicked!');
+            this.togglePanel('git');
+        });
+
+        iconManager.createIcon('icon-database', 'database', -100, -600, 15, 'Database', () => {
+            console.log('Database clicked!');
+            this.togglePanel('database');
+        });
+
+        iconManager.createIcon('icon-api', 'api', 0, -600, 15, 'API Studio', () => {
+            console.log('API clicked!');
+            this.togglePanel('api');
+        });
+
+        iconManager.createIcon('icon-settings', 'settings', 100, -600, 15, 'Settings', () => {
+            console.log('Settings clicked!');
+        });
+
+        iconManager.createIcon('icon-run', 'run', 200, -600, 15, 'Run', () => {
+            console.log('Run clicked!');
+        });
+
+        iconManager.createIcon('icon-debug', 'debug', 300, -600, 15, 'Debug', () => {
+            console.log('Debug clicked!');
+        });
+
+        console.log('[App] Created demo icons on grid');
     }
 
     /**

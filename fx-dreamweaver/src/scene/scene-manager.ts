@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { GridManager } from './grid-manager';
 import { ConnectionManager } from './connection-manager';
+import { IconManager } from './icon-manager';
 
 export type ViewMode = '2d' | '3d' | 'hybrid';
 
@@ -33,6 +34,7 @@ export class SceneManager {
 
     private gridManager: GridManager;
     private connectionManager: ConnectionManager;
+    private iconManager: IconManager;
     private ambientLight: THREE.AmbientLight;
     private directionalLight: THREE.DirectionalLight;
     private pointLight: THREE.PointLight;
@@ -85,6 +87,9 @@ export class SceneManager {
         // Initialize connection manager
         this.connectionManager = new ConnectionManager(this);
 
+        // Initialize icon manager
+        this.iconManager = new IconManager(this);
+
         // Initialize lights
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         this.scene.add(this.ambientLight);
@@ -133,6 +138,13 @@ export class SceneManager {
     }
 
     /**
+     * Get icon manager
+     */
+    getIconManager(): IconManager {
+        return this.iconManager;
+    }
+
+    /**
      * Handle window resize
      */
     private handleResize(): void {
@@ -163,6 +175,9 @@ export class SceneManager {
 
         // Update connection manager
         this.connectionManager.update(delta);
+
+        // Update icon manager
+        this.iconManager.update();
 
         // Render
         this.renderer.render(this.scene, this.camera);

@@ -22,6 +22,8 @@ export class InputManager {
     private isDragging: boolean = false;
     private dragTarget: string | null = null;
     private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
+    private isDragSelecting: boolean = false;
+    private selectionStart: { x: number; y: number } | null = null;
 
     constructor(sceneManager: SceneManager, panelManager: PanelManager) {
         this.sceneManager = sceneManager;
@@ -159,31 +161,65 @@ export class InputManager {
                     gridManager.setBlockHeight(gridX, gridY, block.height - 50);
                 }
             } else if (event.ctrlKey) {
-                // Ctrl+click selects block
+                // Ctrl+click toggles block selection
                 gridManager.selectBlock(gridX, gridY);
             } else {
-                // Regular click extrudes
+                // Regular click extrudes (including all selected blocks!)
                 const block = gridManager.getBlock(gridX, gridY);
                 if (block) {
-                    gridManager.setBlockHeight(gridX, gridY, block.height + 50);
+                    // If this block is selected, extrude all selected blocks
+                    const selectedBlocks = gridManager.getAllBlocks().filter((b: any) =>
+                        (b.mesh.material as any).color.getHex() === 0x8b5cf6
+                    );
+
+                    if (selectedBlocks.length > 0) {
+                        // Extrude all selected blocks
+                        for (const selectedBlock of selectedBlocks) {
+                            gridManager.setBlockHeight(
+                                selectedBlock.gridX,
+                                selectedBlock.gridY,
+                                selectedBlock.height + 50
+                            );
+                        }
+                    } else {
+                        // Just this block
+                        gridManager.setBlockHeight(gridX, gridY, block.height + 50);
+                    }
                 }
             }
             return;
         }
 
-        // Check if clicking on empty grid
+        // Check if clicking on empty grid to start drag-select
         const gridPos = this.sceneManager.raycastToGridPlane(event.clientX, event.clientY);
-        if (gridPos) {
+        if (gridPos && event.ctrlKey) {
+            // Start drag selection
+            this.isDragSelecting = true;
+            this.selectionStart = { x: event.clientX, y: event.clientY };
+        } else if (gridPos) {
+            // Create new block
             const gridManager = this.sceneManager.getGridManager();
-            if (!event.shiftKey && !event.ctrlKey) {
-                // Create new block
-                gridManager.handleGridClick(gridPos.x, gridPos.y, false);
-            }
+            gridManager.handleGridClick(gridPos.x, gridPos.y, false);
         }
     }
 
     private handleMouseMove(event: MouseEvent): void {
-        if (this.isDragging && this.dragTarget) {
+        // Handle drag selection
+        if (this.isDragSelecting && this.selectionStart) {
+            const dx = Math.abs(event.clientX - this.selectionStart.x);
+            const dy = Math.abs(event.clientY - this.selectionStart.y);
+
+            // Only treat as drag-select if moved > 10 pixels
+            if (dx > 10 || dy > 10) {
+                // Select blocks in rectangle
+                this.selectBlocksInRectangle(
+                    this.selectionStart.x,
+                    this.selectionStart.y,
+                    event.clientX,
+                    event.clientY
+                );
+            }
+        } else if (this.isDragging && this.dragTarget) {
             const dx = event.clientX - this.dragOffset.x;
             const dy = event.clientY - this.dragOffset.y;
 
@@ -197,6 +233,14 @@ export class InputManager {
             // Hover effect
             const hit = this.sceneManager.raycast(event.clientX, event.clientY);
             this.sceneManager.setHoveredObject(hit?.object || null);
+
+            // Icon hover
+            if (hit && hit.object.userData?.type === 'grid-icon') {
+                const iconManager = this.sceneManager.getIconManager();
+                iconManager.handleIconHover(hit.object.userData.iconId);
+            } else {
+                this.sceneManager.getIconManager().handleIconHover(null);
+            }
 
             // Grid hover
             if (hit && hit.object.userData?.type === 'grid-block') {
@@ -221,12 +265,58 @@ export class InputManager {
             this.panelManager.snapToGrid(this.dragTarget);
         }
 
+        if (this.isDragSelecting) {
+            this.isDragSelecting = false;
+            this.selectionStart = null;
+        }
+
         this.isDragging = false;
         this.dragTarget = null;
     }
 
+    /**
+     * Select blocks in a rectangle
+     */
+    private selectBlocksInRectangle(x1: number, y1: number, x2: number, y2: number): void {
+        const gridManager = this.sceneManager.getGridManager();
+        const blocks = gridManager.getAllBlocks();
+
+        // Clear existing selection first
+        gridManager.deselectAllBlocks();
+
+        // Get screen bounds
+        const canvas = this.sceneManager.getCanvas();
+        const camera = this.sceneManager.getCamera();
+
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+
+        // Project each block to screen space and check if in rectangle
+        for (const block of blocks) {
+            const screenPos = block.mesh.position.clone();
+            screenPos.project(camera);
+
+            const rect = canvas.getBoundingClientRect();
+            const screenX = (screenPos.x * 0.5 + 0.5) * rect.width + rect.left;
+            const screenY = (-(screenPos.y * 0.5) + 0.5) * rect.height + rect.top;
+
+            if (screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY) {
+                gridManager.selectBlock(block.gridX, block.gridY);
+            }
+        }
+    }
+
     private handleClick(event: MouseEvent): void {
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Click on icon
+        if (hit && hit.userData?.type === 'grid-icon') {
+            const iconManager = this.sceneManager.getIconManager();
+            iconManager.handleIconClick(hit.userData.iconId);
+            return;
+        }
 
         // Shift+click on panel to zoom
         if (event.shiftKey && hit && hit.userData?.panelId) {
@@ -263,6 +353,25 @@ export class InputManager {
         event.preventDefault();
 
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Right-click on grid block to lower it
+        if (hit && hit.object.userData?.type === 'grid-block') {
+            const gridManager = this.sceneManager.getGridManager();
+            const { gridX, gridY } = hit.object.userData;
+            const block = gridManager.getBlock(gridX, gridY);
+
+            if (block) {
+                const newHeight = block.height - 50;
+                if (newHeight <= 0) {
+                    gridManager.removeBlock(gridX, gridY);
+                } else {
+                    gridManager.setBlockHeight(gridX, gridY, newHeight);
+                }
+            }
+            return;
+        }
+
+        // Right-click on panel
         if (hit && hit.userData?.panelId) {
             this.showPanelContextMenu(hit.userData.panelId, event.clientX, event.clientY);
         } else {
