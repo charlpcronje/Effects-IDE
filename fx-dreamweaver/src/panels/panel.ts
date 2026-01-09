@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { SceneManager } from '../scene/scene-manager';
 import { FXBridge } from '../renderer/fx-bridge';
+import { PanelControls } from './panel-controls';
 
 export type PanelType =
     | 'explorer'
@@ -41,6 +42,7 @@ export class Panel {
     protected contentGroup: THREE.Group;
     protected htmlElement: HTMLDivElement | null = null;
     protected cssObject: any = null;
+    protected controls: PanelControls;
 
     protected isSelected: boolean = false;
     protected isFocused: boolean = false;
@@ -70,6 +72,9 @@ export class Panel {
         // Create content group
         this.contentGroup = new THREE.Group();
         this.contentGroup.position.copy(this.mesh.position);
+
+        // Create panel controls
+        this.controls = new PanelControls(this);
     }
 
     /**
@@ -416,9 +421,17 @@ export class Panel {
     }
 
     /**
+     * Get panel controls
+     */
+    getControls(): PanelControls {
+        return this.controls;
+    }
+
+    /**
      * Update panel
      */
     update(): void {
+        this.controls.update();
         this.updateHTMLPosition();
     }
 

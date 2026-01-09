@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { GridManager } from './grid-manager';
+import { ConnectionManager } from './connection-manager';
 
 export type ViewMode = '2d' | '3d' | 'hybrid';
 
@@ -31,9 +32,11 @@ export class SceneManager {
     private selectedObjects: Set<THREE.Object3D> = new Set();
 
     private gridManager: GridManager;
+    private connectionManager: ConnectionManager;
     private ambientLight: THREE.AmbientLight;
     private directionalLight: THREE.DirectionalLight;
     private pointLight: THREE.PointLight;
+    private lastFrameTime: number = 0;
 
     constructor(container: HTMLElement, config: SceneConfig = {}) {
         this.container = container;
@@ -79,6 +82,9 @@ export class SceneManager {
         // Initialize grid manager
         this.gridManager = new GridManager(this);
 
+        // Initialize connection manager
+        this.connectionManager = new ConnectionManager(this);
+
         // Initialize lights
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         this.scene.add(this.ambientLight);
@@ -120,6 +126,13 @@ export class SceneManager {
     }
 
     /**
+     * Get connection manager
+     */
+    getConnectionManager(): ConnectionManager {
+        return this.connectionManager;
+    }
+
+    /**
      * Handle window resize
      */
     private handleResize(): void {
@@ -136,12 +149,20 @@ export class SceneManager {
      * Update scene
      */
     update(): void {
+        // Calculate delta time
+        const currentTime = performance.now() * 0.001;
+        const delta = this.lastFrameTime > 0 ? currentTime - this.lastFrameTime : 0.016;
+        this.lastFrameTime = currentTime;
+
         // Smooth zoom
         this.zoom += (this.targetZoom - this.zoom) * 0.1;
         this.camera.position.z = 1000 / this.zoom;
 
         // Update grid manager
         this.gridManager.update();
+
+        // Update connection manager
+        this.connectionManager.update(delta);
 
         // Render
         this.renderer.render(this.scene, this.camera);

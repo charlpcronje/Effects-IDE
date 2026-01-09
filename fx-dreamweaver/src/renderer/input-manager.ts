@@ -227,6 +227,17 @@ export class InputManager {
 
     private handleClick(event: MouseEvent): void {
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Shift+click on panel to zoom
+        if (event.shiftKey && hit && hit.userData?.panelId) {
+            const panel = this.panelManager.getPanel(hit.userData.panelId);
+            if (panel) {
+                panel.getControls().zoomIn();
+            }
+            return;
+        }
+
+        // Regular click to select
         if (hit && hit.userData?.panelId) {
             this.panelManager.selectPanel(hit.userData.panelId);
         } else {
@@ -318,15 +329,35 @@ export class InputManager {
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
 
-            if (e.ctrlKey || e.metaKey) {
-                // Zoom
+            // Check if hovering over a panel
+            const hit = this.sceneManager.raycast(e.clientX, e.clientY);
+
+            if (hit && hit.userData?.panelId && !e.ctrlKey && !e.metaKey) {
+                // Mouse wheel on panel - rotate it!
+                const panel = this.panelManager.getPanel(hit.userData.panelId);
+                if (panel) {
+                    const controls = panel.getControls();
+
+                    if (e.shiftKey) {
+                        // Shift+wheel = rotate Y axis (spin)
+                        controls.rotateY(e.deltaY > 0 ? 0.1 : -0.1);
+                    } else if (e.altKey) {
+                        // Alt+wheel = rotate X axis (tilt)
+                        controls.rotateX(e.deltaY > 0 ? 0.1 : -0.1);
+                    } else {
+                        // Regular wheel = rotate Z axis
+                        controls.rotateZ(e.deltaY > 0 ? 0.1 : -0.1);
+                    }
+                }
+            } else if (e.ctrlKey || e.metaKey) {
+                // Ctrl+wheel = Zoom camera
                 if (e.deltaY < 0) {
                     this.sceneManager.zoomIn();
                 } else {
                     this.sceneManager.zoomOut();
                 }
             } else {
-                // Pan
+                // Regular wheel = Pan camera
                 this.sceneManager.pan(-e.deltaX, e.deltaY);
             }
         }, { passive: false });

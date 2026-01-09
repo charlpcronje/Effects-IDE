@@ -89,7 +89,36 @@ export class PanelManager {
 
         this.fxBridge.emit('panel.create', { panelId: id, type: options.type });
 
+        // Create connections to other panels (for visual effect)
+        this.updatePanelConnections();
+
         return panel;
+    }
+
+    /**
+     * Update panel connections (creates glowing lines between panels)
+     */
+    private updatePanelConnections(): void {
+        const connectionManager = this.sceneManager.getConnectionManager();
+        const panels = Array.from(this.panels.values());
+
+        // Connect adjacent panels
+        for (let i = 0; i < panels.length; i++) {
+            for (let j = i + 1; j < panels.length; j++) {
+                const panel1 = panels[i];
+                const panel2 = panels[j];
+
+                const pos1 = panel1.getPosition();
+                const pos2 = panel2.getPosition();
+                const distance = pos1.distanceTo(pos2);
+
+                // Only connect nearby panels (within 700 units)
+                if (distance < 700) {
+                    const connId = `panel-${panel1.getId()}-${panel2.getId()}`;
+                    connectionManager.createConnection(connId, pos1, pos2);
+                }
+            }
+        }
     }
 
     /**
