@@ -258,6 +258,48 @@ export class GridManager {
     }
 
     /**
+     * Extrude block from side (horizontal extrusion)
+     */
+    extrudeFromSide(
+        sourceX: number,
+        sourceY: number,
+        direction: 'north' | 'south' | 'east' | 'west'
+    ): GridBlock | null {
+        // Check if source block exists
+        const sourceBlock = this.getBlock(sourceX, sourceY);
+        if (!sourceBlock) {
+            console.warn('[GridManager] Source block not found for side extrusion');
+            return null;
+        }
+
+        // Calculate target cell
+        let targetX = sourceX;
+        let targetY = sourceY;
+
+        switch (direction) {
+            case 'north':
+                targetY += 1;
+                break;
+            case 'south':
+                targetY -= 1;
+                break;
+            case 'east':
+                targetX += 1;
+                break;
+            case 'west':
+                targetX -= 1;
+                break;
+        }
+
+        // Create or extend target block to match source height
+        const targetBlock = this.extrudeBlock(targetX, targetY, 0);
+        this.setBlockHeight(targetX, targetY, sourceBlock.height);
+
+        console.log(`[GridManager] Extruded ${direction} from (${sourceX},${sourceY}) to (${targetX},${targetY})`);
+        return targetBlock;
+    }
+
+    /**
      * Handle grid hover
      */
     handleGridHover(worldX: number, worldY: number): void {

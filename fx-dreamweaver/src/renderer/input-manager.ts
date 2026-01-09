@@ -26,6 +26,9 @@ export class InputManager {
     private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
     private isDragSelecting: boolean = false;
     private selectionStart: { x: number; y: number } | null = null;
+    private isRotatingCamera: boolean = false;
+    private ctrlTapCount: number = 0;
+    private ctrlTapTimer: number | null = null;
 
     constructor(sceneManager: SceneManager, panelManager: PanelManager) {
         this.sceneManager = sceneManager;
@@ -46,6 +49,41 @@ export class InputManager {
     }
 
     /**
+     * Handle Ctrl triple-tap for view cycling
+     */
+    private handleCtrlTap(): void {
+        this.ctrlTapCount++;
+
+        // Clear previous timer
+        if (this.ctrlTapTimer) {
+            clearTimeout(this.ctrlTapTimer);
+        }
+
+        // Reset after 500ms
+        this.ctrlTapTimer = window.setTimeout(() => {
+            this.ctrlTapCount = 0;
+        }, 500);
+
+        // On third tap, cycle views
+        if (this.ctrlTapCount === 3) {
+            this.ctrlTapCount = 0;
+            this.cycleViewMode();
+        }
+    }
+
+    /**
+     * Cycle through view modes
+     */
+    private cycleViewMode(): void {
+        const current = this.sceneManager.getViewMode();
+        const modes: Array<'2d' | '3d' | 'hybrid' | 'free'> = ['2d', '3d', 'hybrid', 'free'];
+        const currentIndex = modes.indexOf(current);
+        const nextIndex = (currentIndex + 1) % modes.length;
+        this.sceneManager.setViewMode(modes[nextIndex]);
+        console.log(`[InputManager] View cycled to: ${modes[nextIndex]}`);
+    }
+
+    /**
      * Setup default keyboard bindings
      */
     private setupKeyboardBindings(): void {
@@ -54,10 +92,17 @@ export class InputManager {
         this.bind({ key: 'Tab', action: 'focusNext', handler: () => this.handleFocusNext() });
         this.bind({ key: 'Tab', shift: true, action: 'focusPrev', handler: () => this.handleFocusPrev() });
 
-        // View controls
-        this.bind({ key: '1', ctrl: true, action: 'view2d', handler: () => this.sceneManager.setViewMode('2d') });
-        this.bind({ key: '2', ctrl: true, action: 'view3d', handler: () => this.sceneManager.setViewMode('3d') });
-        this.bind({ key: '3', ctrl: true, action: 'viewHybrid', handler: () => this.sceneManager.setViewMode('hybrid') });
+        // View controls (disabled - use triple-tap Ctrl instead)
+        // this.bind({ key: '1', ctrl: true, action: 'view2d', handler: () => this.sceneManager.setViewMode('2d') });
+        // this.bind({ key: '2', ctrl: true, action: 'view3d', handler: () => this.sceneManager.setViewMode('3d') });
+        // this.bind({ key: '3', ctrl: true, action: 'viewHybrid', handler: () => this.sceneManager.setViewMode('hybrid') });
+
+        // Triple-tap Ctrl for view cycling
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Control') {
+                this.handleCtrlTap();
+            }
+        });
 
         // Zoom
         this.bind({ key: '=', ctrl: true, action: 'zoomIn', handler: () => this.sceneManager.zoomIn() });
@@ -163,7 +208,26 @@ export class InputManager {
             const gridManager = this.sceneManager.getGridManager();
             const { gridX, gridY } = hit.object.userData;
 
-            if (event.shiftKey) {
+            if (event.altKey) {
+                // Alt+click extrudes from side based on click position on block
+                const block = gridManager.getBlock(gridX, gridY);
+                if (block) {
+                    // Determine which side was clicked based on hit point
+                    const localPoint = hit.point.clone().sub(block.mesh.position);
+                    const absX = Math.abs(localPoint.x);
+                    const absY = Math.abs(localPoint.y);
+
+                    let direction: 'north' | 'south' | 'east' | 'west';
+
+                    if (absX > absY) {
+                        direction = localPoint.x > 0 ? 'east' : 'west';
+                    } else {
+                        direction = localPoint.y > 0 ? 'north' : 'south';
+                    }
+
+                    gridManager.extrudeFromSide(gridX, gridY, direction);
+                }
+            } else if (event.shiftKey) {
                 // Shift+click lowers block
                 const block = gridManager.getBlock(gridX, gridY);
                 if (block) {
@@ -213,6 +277,12 @@ export class InputManager {
     }
 
     private handleMouseMove(event: MouseEvent): void {
+        // Handle camera rotation
+        if (this.isRotatingCamera) {
+            this.sceneManager.getCameraController().updateRotation(event.clientX, event.clientY);
+            return;
+        }
+
         // Handle drag selection
         if (this.isDragSelecting && this.selectionStart) {
             const dx = Math.abs(event.clientX - this.selectionStart.x);
@@ -269,6 +339,12 @@ export class InputManager {
     }
 
     private handleMouseUp(_event: MouseEvent): void {
+        // Stop camera rotation
+        if (this.isRotatingCamera) {
+            this.sceneManager.getCameraController().stopRotation();
+            this.isRotatingCamera = false;
+        }
+
         if (this.isDragging && this.dragTarget) {
             // Try surface snapping first
             const panel = this.panelManager.getPanel(this.dragTarget);
@@ -389,12 +465,12 @@ export class InputManager {
     }
 
     private handleContextMenu(event: MouseEvent): void {
-        event.preventDefault();
-
+        // Don't prevent default if we're going to start camera rotation
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
 
-        // Right-click on grid block to lower it
-        if (hit && hit.object.userData?.type === 'grid-block') {
+        // Right-click on grid block to lower it (only if Ctrl not held)
+        if (hit && hit.object.userData?.type === 'grid-block' && !event.ctrlKey) {
+            event.preventDefault();
             const gridManager = this.sceneManager.getGridManager();
             const { gridX, gridY } = hit.object.userData;
             const block = gridManager.getBlock(gridX, gridY);
@@ -410,7 +486,16 @@ export class InputManager {
             return;
         }
 
+        // Right-click on empty space in free mode - start camera rotation
+        if (this.sceneManager.getViewMode() === 'free' && !hit) {
+            event.preventDefault();
+            this.isRotatingCamera = true;
+            this.sceneManager.getCameraController().startRotation(event.clientX, event.clientY);
+            return;
+        }
+
         // Right-click on panel
+        event.preventDefault();
         if (hit && hit.userData?.panelId) {
             this.showPanelContextMenu(hit.userData.panelId, event.clientX, event.clientY);
         } else {
@@ -498,15 +583,24 @@ export class InputManager {
                     }
                 }
             } else if (e.ctrlKey || e.metaKey) {
-                // Ctrl+wheel = Zoom camera
-                if (e.deltaY < 0) {
-                    this.sceneManager.zoomIn();
+                // Ctrl+wheel = Zoom camera (or zoom in free mode)
+                if (this.sceneManager.getViewMode() === 'free') {
+                    this.sceneManager.getCameraController().zoom(e.deltaY > 0 ? -1 : 1);
                 } else {
-                    this.sceneManager.zoomOut();
+                    if (e.deltaY < 0) {
+                        this.sceneManager.zoomIn();
+                    } else {
+                        this.sceneManager.zoomOut();
+                    }
                 }
             } else {
-                // Regular wheel = Pan camera
-                this.sceneManager.pan(-e.deltaX, e.deltaY);
+                // Regular wheel = Pan camera (or move in free mode)
+                if (this.sceneManager.getViewMode() === 'free') {
+                    // In free mode, wheel moves camera forward/back
+                    this.sceneManager.getCameraController().zoom(e.deltaY > 0 ? -0.5 : 0.5);
+                } else {
+                    this.sceneManager.pan(-e.deltaX, e.deltaY);
+                }
             }
         }, { passive: false });
     }

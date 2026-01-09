@@ -10,7 +10,7 @@ export interface LayoutData {
     version: string;
     name: string;
     created: number;
-    viewMode: '2d' | '3d' | 'hybrid';
+    viewMode: '2d' | '3d' | 'hybrid' | 'free';
     camera: {
         zoom: number;
         panX: number;

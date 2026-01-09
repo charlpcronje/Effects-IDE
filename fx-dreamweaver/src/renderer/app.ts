@@ -9,6 +9,7 @@ import { FXBridge } from './fx-bridge';
 import { InputManager } from './input-manager';
 import { CommandPalette } from './command-palette';
 import { LayoutManager } from './layout-manager';
+import { StatusToast } from './status-toast';
 
 export class DreamweaverApp {
     private sceneManager: SceneManager;
@@ -18,6 +19,7 @@ export class DreamweaverApp {
     private inputManager: InputManager;
     private commandPalette: CommandPalette;
     private layoutManager: LayoutManager;
+    private statusToast: StatusToast;
 
     private container: HTMLElement;
     private running: boolean = false;
@@ -31,6 +33,7 @@ export class DreamweaverApp {
         this.inputManager = new InputManager(this.sceneManager, this.panelManager);
         this.commandPalette = new CommandPalette(this);
         this.layoutManager = new LayoutManager(this.sceneManager, this.panelManager, this.fxBridge);
+        this.statusToast = new StatusToast();
     }
 
     /**
@@ -106,34 +109,34 @@ export class DreamweaverApp {
 
         // Create a row of command icons
         iconManager.createIcon('icon-search', 'search', -300, -600, 15, 'Search Files', () => {
-            console.log('Search clicked!');
+            this.statusToast.info('🔍 Search feature coming soon!');
         });
 
         iconManager.createIcon('icon-git', 'git', -200, -600, 15, 'Git', () => {
-            console.log('Git clicked!');
             this.togglePanel('git');
+            this.statusToast.success('🔀 Git panel opened!');
         });
 
         iconManager.createIcon('icon-database', 'database', -100, -600, 15, 'Database', () => {
-            console.log('Database clicked!');
             this.togglePanel('database');
+            this.statusToast.success('🗄️ Database panel opened!');
         });
 
         iconManager.createIcon('icon-api', 'api', 0, -600, 15, 'API Studio', () => {
-            console.log('API clicked!');
             this.togglePanel('api');
+            this.statusToast.success('🔌 API Studio opened!');
         });
 
         iconManager.createIcon('icon-settings', 'settings', 100, -600, 15, 'Settings', () => {
-            console.log('Settings clicked!');
+            this.statusToast.info('⚙️ Settings coming soon!');
         });
 
         iconManager.createIcon('icon-run', 'run', 200, -600, 15, 'Run', () => {
-            console.log('Run clicked!');
+            this.statusToast.info('▶ Run feature coming soon!');
         });
 
         iconManager.createIcon('icon-debug', 'debug', 300, -600, 15, 'Debug', () => {
-            console.log('Debug clicked!');
+            this.statusToast.info('🐛 Debug feature coming soon!');
         });
 
         console.log('[App] Created demo icons on grid');

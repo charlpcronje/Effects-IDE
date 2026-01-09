@@ -7,9 +7,10 @@ import { GridManager } from './grid-manager';
 import { ConnectionManager } from './connection-manager';
 import { IconManager } from './icon-manager';
 import { NodeGraphVisualizer } from './node-graph-visualizer';
+import { CameraController } from './camera-controller';
 import { FXBridge } from '../renderer/fx-bridge';
 
-export type ViewMode = '2d' | '3d' | 'hybrid';
+export type ViewMode = '2d' | '3d' | 'hybrid' | 'free';
 
 export interface SceneConfig {
     backgroundColor?: number;
@@ -38,6 +39,7 @@ export class SceneManager {
     private connectionManager: ConnectionManager;
     private iconManager: IconManager;
     private nodeGraphVisualizer: NodeGraphVisualizer | null = null;
+    private cameraController: CameraController;
     private ambientLight: THREE.AmbientLight;
     private directionalLight: THREE.DirectionalLight;
     private pointLight: THREE.PointLight;
@@ -93,6 +95,9 @@ export class SceneManager {
 
         // Initialize icon manager
         this.iconManager = new IconManager(this);
+
+        // Initialize camera controller
+        this.cameraController = new CameraController(this.camera);
 
         // Initialize lights
         this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -167,6 +172,13 @@ export class SceneManager {
     }
 
     /**
+     * Get camera controller
+     */
+    getCameraController(): CameraController {
+        return this.cameraController;
+    }
+
+    /**
      * Handle window resize
      */
     private handleResize(): void {
@@ -188,9 +200,14 @@ export class SceneManager {
         const delta = this.lastFrameTime > 0 ? currentTime - this.lastFrameTime : 0.016;
         this.lastFrameTime = currentTime;
 
-        // Smooth zoom
-        this.zoom += (this.targetZoom - this.zoom) * 0.1;
-        this.camera.position.z = 1000 / this.zoom;
+        // Update camera controller
+        if (this.viewMode === 'free') {
+            this.cameraController.update(delta);
+        } else {
+            // Smooth zoom for fixed modes
+            this.zoom += (this.targetZoom - this.zoom) * 0.1;
+            this.camera.position.z = 1000 / this.zoom;
+        }
 
         // Update grid manager
         this.gridManager.update();
@@ -242,6 +259,8 @@ export class SceneManager {
                 // Top-down view
                 this.camera.position.set(this.panOffset.x, this.panOffset.y, 1000 / this.zoom);
                 this.camera.rotation.set(0, 0, 0);
+                this.cameraController.setPosition(this.panOffset.x, this.panOffset.y, 1000 / this.zoom);
+                this.cameraController.setRotation(0, 0, 0);
                 break;
 
             case '3d':
@@ -252,6 +271,11 @@ export class SceneManager {
                     500 / this.zoom
                 );
                 this.camera.lookAt(this.panOffset.x, this.panOffset.y, 0);
+                this.cameraController.setPosition(
+                    this.panOffset.x + 500,
+                    this.panOffset.y + 500,
+                    500 / this.zoom
+                );
                 break;
 
             case 'hybrid':
@@ -262,6 +286,16 @@ export class SceneManager {
                     800 / this.zoom
                 );
                 this.camera.lookAt(this.panOffset.x, this.panOffset.y, 0);
+                this.cameraController.setPosition(
+                    this.panOffset.x + 200,
+                    this.panOffset.y + 200,
+                    800 / this.zoom
+                );
+                break;
+
+            case 'free':
+                // Free camera mode - use current position
+                console.log('[SceneManager] Free camera mode - use WASD to move, right-drag to rotate');
                 break;
         }
 
