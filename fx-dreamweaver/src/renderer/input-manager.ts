@@ -4,6 +4,7 @@
 
 import { SceneManager } from '../scene/scene-manager';
 import { PanelManager } from '../panels/panel-manager';
+import { SurfaceSnapper } from '../scene/surface-snapper';
 
 interface KeyBinding {
     key: string;
@@ -18,6 +19,7 @@ interface KeyBinding {
 export class InputManager {
     private sceneManager: SceneManager;
     private panelManager: PanelManager;
+    private surfaceSnapper: SurfaceSnapper | null = null;
     private bindings: KeyBinding[] = [];
     private isDragging: boolean = false;
     private dragTarget: string | null = null;
@@ -28,6 +30,7 @@ export class InputManager {
     constructor(sceneManager: SceneManager, panelManager: PanelManager) {
         this.sceneManager = sceneManager;
         this.panelManager = panelManager;
+        this.surfaceSnapper = new SurfaceSnapper(sceneManager.getGridManager());
     }
 
     /**
@@ -267,8 +270,29 @@ export class InputManager {
 
     private handleMouseUp(_event: MouseEvent): void {
         if (this.isDragging && this.dragTarget) {
-            // Snap to grid if enabled
-            this.panelManager.snapToGrid(this.dragTarget);
+            // Try surface snapping first
+            const panel = this.panelManager.getPanel(this.dragTarget);
+            if (panel && this.surfaceSnapper) {
+                const panelPos = panel.getPosition();
+                const surface = this.surfaceSnapper.snapToSurface(panelPos);
+
+                if (surface) {
+                    // Snap to surface
+                    panel.setPosition(surface.position.x, surface.position.y, surface.position.z);
+
+                    // Rotate panel to align with surface
+                    const rotation = this.surfaceSnapper.getRotationForSurface(surface.face);
+                    const controls = panel.getControls();
+                    const transform = controls.getTransform();
+                    transform.rotation.copy(rotation);
+                    controls.setTransform(transform);
+
+                    console.log(`[InputManager] Snapped to ${surface.face} of block at (${surface.block.gridX}, ${surface.block.gridY})`);
+                } else {
+                    // Regular grid snap
+                    this.panelManager.snapToGrid(this.dragTarget);
+                }
+            }
         }
 
         if (this.isDragSelecting) {
