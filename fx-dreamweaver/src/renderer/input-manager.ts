@@ -67,6 +67,12 @@ export class InputManager {
         this.bind({ key: 'ArrowUp', alt: true, action: 'panelUp', handler: () => this.navigatePanel('up') });
         this.bind({ key: 'ArrowDown', alt: true, action: 'panelDown', handler: () => this.navigatePanel('down') });
 
+        // Node graph toggle
+        this.bind({ key: 'n', ctrl: true, shift: true, action: 'toggleNodeGraph', handler: () => {
+            const visualizer = this.sceneManager.getNodeGraphVisualizer();
+            if (visualizer) visualizer.toggle();
+        }});
+
         // Keyboard event listener
         document.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
@@ -310,6 +316,15 @@ export class InputManager {
 
     private handleClick(event: MouseEvent): void {
         const hit = this.sceneManager.raycast(event.clientX, event.clientY);
+
+        // Click on FX node
+        if (hit && hit.userData?.type === 'fx-node') {
+            const visualizer = this.sceneManager.getNodeGraphVisualizer();
+            if (visualizer) {
+                visualizer.handleNodeClick(hit.userData.nodePath, event.ctrlKey);
+            }
+            return;
+        }
 
         // Click on icon
         if (hit && hit.userData?.type === 'grid-icon') {

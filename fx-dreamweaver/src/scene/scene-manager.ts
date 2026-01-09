@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { GridManager } from './grid-manager';
 import { ConnectionManager } from './connection-manager';
 import { IconManager } from './icon-manager';
+import { NodeGraphVisualizer } from './node-graph-visualizer';
+import { FXBridge } from '../renderer/fx-bridge';
 
 export type ViewMode = '2d' | '3d' | 'hybrid';
 
@@ -35,10 +37,12 @@ export class SceneManager {
     private gridManager: GridManager;
     private connectionManager: ConnectionManager;
     private iconManager: IconManager;
+    private nodeGraphVisualizer: NodeGraphVisualizer | null = null;
     private ambientLight: THREE.AmbientLight;
     private directionalLight: THREE.DirectionalLight;
     private pointLight: THREE.PointLight;
     private lastFrameTime: number = 0;
+    private fxBridge: FXBridge | null = null;
 
     constructor(container: HTMLElement, config: SceneConfig = {}) {
         this.container = container;
@@ -116,9 +120,20 @@ export class SceneManager {
     /**
      * Initialize scene
      */
-    async init(): Promise<void> {
+    async init(fxBridge?: FXBridge): Promise<void> {
         // Initialize grid manager
         this.gridManager.init();
+
+        // Initialize node graph visualizer if FX bridge provided
+        if (fxBridge) {
+            this.fxBridge = fxBridge;
+            this.nodeGraphVisualizer = new NodeGraphVisualizer(
+                this,
+                fxBridge,
+                this.connectionManager
+            );
+            this.nodeGraphVisualizer.init();
+        }
 
         console.log('[SceneManager] Initialized');
     }
@@ -142,6 +157,13 @@ export class SceneManager {
      */
     getIconManager(): IconManager {
         return this.iconManager;
+    }
+
+    /**
+     * Get node graph visualizer
+     */
+    getNodeGraphVisualizer(): NodeGraphVisualizer | null {
+        return this.nodeGraphVisualizer;
     }
 
     /**
@@ -178,6 +200,11 @@ export class SceneManager {
 
         // Update icon manager
         this.iconManager.update();
+
+        // Update node graph visualizer
+        if (this.nodeGraphVisualizer) {
+            this.nodeGraphVisualizer.update();
+        }
 
         // Render
         this.renderer.render(this.scene, this.camera);

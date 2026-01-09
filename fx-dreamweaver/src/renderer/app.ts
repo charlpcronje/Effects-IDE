@@ -40,8 +40,8 @@ export class DreamweaverApp {
         // Initialize FX bridge
         await this.fxBridge.init();
 
-        // Initialize scene
-        await this.sceneManager.init();
+        // Initialize scene (pass FX bridge for node graph)
+        await this.sceneManager.init(this.fxBridge);
 
         // Initialize theme
         await this.themeManager.init();
@@ -175,6 +175,19 @@ export class DreamweaverApp {
         window.dreamweaver.on('menu:save', () => this.saveLayout());
         window.dreamweaver.on('menu:export-workspace', () => this.exportLayout());
         window.dreamweaver.on('menu:import-workspace', () => this.importLayout());
+
+        // Node graph
+        window.dreamweaver.on('menu:panel-node-graph', () => this.toggleNodeGraph());
+    }
+
+    /**
+     * Toggle node graph visibility
+     */
+    toggleNodeGraph(): void {
+        const visualizer = this.sceneManager.getNodeGraphVisualizer();
+        if (visualizer) {
+            visualizer.toggle();
+        }
     }
 
     /**
